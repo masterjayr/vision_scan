@@ -1,0 +1,71 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+# Libraries should not include pubspec.lock, per https://dart.dev/guides/libraries/private-files#pubspeclock.
+# Flutter/Dart
+/pubspec.lock
+**/doc/api/
+.dart_tool/
+.flutter-plugins-dependencies
+.flutter-plugins
+/build/
+/coverage/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral
+ios/Frameworks/
+ios/*.xcframework
+ios/*.framework
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/src/main/jniLibs/
+example/android/app/src/main/jniLibs/
+
+# Native build outputs
+native/build/
+native/.build/
+native/**/build/
+native/libs/
+native/**/libs/
+native/**/jniLibs/
+native/android/*/
+native/include/opencv2/
+native/include/ZXing/
+
+# Native iOS outputs
+native/ios/Frameworks/
+native/ios/**/*.xcframework
+native/ios/**/*.framework
+
+# Prebuilt binaries
+*.so
+*.a
+*.dylib

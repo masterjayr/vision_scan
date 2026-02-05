@@ -1,0 +1,114 @@
+name: Native Build (iOS)
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-26
+
+    steps:
+      - name: Select Xcode 26.0.1
+        run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          brew install cmake ninja
+
+      - name: Build iOS native framework
+        env:
+          OPENCV_ZIP_URL: https://github.com/masterjayr/scanner-binaries/releases/download/opencv-ios-v1.0.0/opencv2.framework.zip
+        run: |
+          chmod +x scripts/build_ios.sh
+          scripts/build_ios.sh
+
+      - name: Upload xcframework artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vision_scan_native_ios
+          path: ios/Frameworks/vision_scan_native.xcframework
+
+      - name: Package iOS xcframework
+        run: |
+          mkdir -p dist/ios
+          cd ios/Frameworks
+          zip -r ../../dist/ios/vision_scan_native-ios.zip vision_scan_native.xcframework
+
+      - name: Upload iOS binaries to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/ios/vision_scan_native-ios.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  android-native:
+    name: Build Android native libs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK
+        run: |
+          sdkmanager "ndk;29.0.13599879"
+
+      - name: Export ANDROID_NDK_HOME
+        run: |
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/29.0.13599879" >> $GITHUB_ENV
+
+      - name: Make scripts executable
+        run: |
+          chmod +x scripts/build_android.sh
+
+      - name: Build Android native libraries
+        run: |
+          scripts/build_android.sh
+
+      - name: Verify outputs
+        run: |
+          ls -R android/src/main/jniLibs
+
+      - name: Package Android binaries
+        run: |
+          mkdir -p dist/android
+
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            mkdir -p dist/android/$abi
+            cp android/src/main/jniLibs/$abi/*.so dist/android/$abi/
+            cp native/android/$abi/*.so dist/android/$abi/
+            (cd dist/android && zip -r android-$abi.zip $abi)
+          done
+
+      - name: Upload Android binaries to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/android/android-arm64-v8a.zip
+            dist/android/android-armeabi-v7a.zip
+            dist/android/android-x86_64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
