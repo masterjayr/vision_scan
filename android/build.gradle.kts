@@ -2,7 +2,7 @@ import java.net.URL
 import java.util.zip.ZipInputStream
 
 group = "com.vision.scan.vision_scan"
-version = "0.0.4"
+version = "0.0.1"
 
 plugins {
     id("com.android.library")
@@ -32,7 +32,7 @@ repositories {
 // -------------------------------------------------
 val pluginVersion = project.version.toString()
 val baseUrl =
-    "https://github.com/masterjayr/ffi_practice/releases/download/v$pluginVersion"
+    "https://github.com/masterjayr/vision_scan/releases/download/v$pluginVersion"
 
 val abis = listOf(
     "arm64-v8a",
