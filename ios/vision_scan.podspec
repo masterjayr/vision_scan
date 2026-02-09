@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'vision_scan'
-  s.version          = '0.0.1'
+  s.version          = '0.0.2'
   s.summary          = 'High-performance on-device scanner using OpenCV and ZXing'
   s.description      = <<-DESC
     vision_scan is a Flutter FFI plugin that provides fast, on-device
@@ -21,15 +21,32 @@ Pod::Spec.new do |s|
   s.ios.deployment_target = '12.0'
 
   # -------------------------------------------------
-  # Download prebuilt xcframework from GitHub Releases
-  # (runs even when plugin is used via :path)
+  # Prefer local xcframework for development; else download from GitHub
+  # Check Frameworks/ FIRST so a rebuilt xcframework is always used (no clean needed).
+  # - ios/Frameworks/vision_scan_native.xcframework or vision_scan.xcframework: use (symlink)
+  # - Already in ios/: skip (downloaded or symlink from above)
+  # - Otherwise: download release zip
   # -------------------------------------------------
   s.prepare_command = <<-CMD
     set -e
 
     FRAMEWORK_NAME="vision_scan_native.xcframework"
     ZIP_NAME="vision_scan_native-ios.zip"
-    ZIP_URL="https://github.com/masterjayr/vision_scan/releases/download/v#{s.version}/#{ZIP_NAME}"
+    ZIP_URL="https://github.com/masterjayr/vision_scan/releases/download/v#{s.version}/$ZIP_NAME"
+
+    if [ -d "Frameworks/$FRAMEWORK_NAME" ]; then
+      echo "✅ Using local Frameworks/$FRAMEWORK_NAME (rebuilt xcframework is used)"
+      rm -rf "$FRAMEWORK_NAME"
+      ln -sf "Frameworks/$FRAMEWORK_NAME" "$FRAMEWORK_NAME"
+      exit 0
+    fi
+
+    if [ -d "Frameworks/vision_scan.xcframework" ]; then
+      echo "✅ Using local Frameworks/vision_scan.xcframework as $FRAMEWORK_NAME"
+      rm -rf "$FRAMEWORK_NAME"
+      ln -sf "Frameworks/vision_scan.xcframework" "$FRAMEWORK_NAME"
+      exit 0
+    fi
 
     if [ -d "$FRAMEWORK_NAME" ]; then
       echo "✅ $FRAMEWORK_NAME already exists, skipping download"
