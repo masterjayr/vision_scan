@@ -7,12 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0077B88E2F436498000F4944 /* qr_engine.h in Headers */ = {isa = PBXBuildFile; fileRef = 0077B88D2F436498000F4944 /* qr_engine.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		0077B8902F4364B0000F4944 /* native.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0077B88F2F4364B0000F4944 /* native.cpp */; };
 		0082A8492F352E030091EE6B /* opencv2.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0082A8482F352E030091EE6B /* opencv2.framework */; };
 		0082A84B2F352E160091EE6B /* ZXing.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0082A84A2F352E160091EE6B /* ZXing.xcframework */; };
 		0082A85A2F3533AA0091EE6B /* vision_scan_native.h in Headers */ = {isa = PBXBuildFile; fileRef = 0082A8592F3533AA0091EE6B /* vision_scan_native.h */; settings = {ATTRIBUTES = (Public, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0077B88D2F436498000F4944 /* qr_engine.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = qr_engine.h; path = ../../include/qr_engine.h; sourceTree = "<group>"; };
+		0077B88F2F4364B0000F4944 /* native.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = native.cpp; path = ../../src/native.cpp; sourceTree = "<group>"; };
 		0082A7FC2F3520CD0091EE6B /* vision_scan_native.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = vision_scan_native.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		0082A8482F352E030091EE6B /* opencv2.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = opencv2.framework; path = ../Frameworks/opencv2.framework; sourceTree = "<group>"; };
 		0082A84A2F352E160091EE6B /* ZXing.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = ZXing.xcframework; path = ../Frameworks/ZXing.xcframework; sourceTree = "<group>"; };
@@ -29,9 +33,6 @@
 			);
 			privateHeaders = (
 				_private.h,
-			);
-			publicHeaders = (
-				qr_engine.h,
 			);
 			target = 0082A7FB2F3520CD0091EE6B /* vision_scan_native */;
 		};
@@ -64,6 +65,8 @@
 		0082A7F22F3520CD0091EE6B = {
 			isa = PBXGroup;
 			children = (
+				0077B88F2F4364B0000F4944 /* native.cpp */,
+				0077B88D2F436498000F4944 /* qr_engine.h */,
 				0082A8592F3533AA0091EE6B /* vision_scan_native.h */,
 				0082A7FE2F3520CD0091EE6B /* vision_scan_native */,
 				0082A8472F352E020091EE6B /* Frameworks */,
@@ -96,6 +99,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0082A85A2F3533AA0091EE6B /* vision_scan_native.h in Headers */,
+				0077B88E2F436498000F4944 /* qr_engine.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -174,6 +178,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0077B8902F4364B0000F4944 /* native.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -196,10 +201,7 @@
 				ENABLE_MODULE_VERIFIER = YES;
 				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/../Frameworks";
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/../src/**",
-					"$(PROJECT_DIR)/../include/**",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/../../include/**";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -237,10 +239,7 @@
 				ENABLE_MODULE_VERIFIER = YES;
 				FRAMEWORK_SEARCH_PATHS = "$(PROJECT_DIR)/../Frameworks";
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = (
-					"$(PROJECT_DIR)/../src/**",
-					"$(PROJECT_DIR)/../include/**",
-				);
+				HEADER_SEARCH_PATHS = "$(PROJECT_DIR)/../../include/**";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = (

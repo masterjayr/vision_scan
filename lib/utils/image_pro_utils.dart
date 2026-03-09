@@ -34,3 +34,24 @@ Uint8List bgraToGray(CameraImage image) {
 
   return gray;
 }
+
+Uint8List androidYPlaneToGray(CameraImage image) {
+  final plane = image.planes[0];
+  final bytes = plane.bytes;
+  final width = image.width;
+  final height = image.height;
+  final rowStride = plane.bytesPerRow;
+
+  // If no padding, return the bytes directly — zero copy
+  if (rowStride == width) return bytes;
+
+  // Strip padding — only copy actual pixel columns
+  final gray = Uint8List(width * height);
+  int dst = 0;
+  for (int y = 0; y < height; y++) {
+    final rowStart = y * rowStride;
+    gray.setRange(dst, dst + width, bytes, rowStart);
+    dst += width;
+  }
+  return gray;
+}

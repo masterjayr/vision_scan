@@ -52,10 +52,37 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       home: Scaffold(
         appBar: AppBar(title: const Text('Plugin example app')),
-        body: visionScan.buildQRScanner(
-          onDetect: (result) {
-            debugPrint("QR = $result");
-          },
+        body: Column(
+          children: [
+            Builder(
+              builder: (ctx) => OutlinedButton(
+                onPressed: () {
+                  Navigator.push(
+                    ctx, // ← ctx is inside MaterialApp, has Navigator
+                    MaterialPageRoute(
+                      builder: (_) => Scaffold(
+                        body: visionScan.buildQRScanner(
+                          stopOnDetect: false,
+                          onDetect: (text) {
+                            debugPrint("QR = $text");
+                          },
+                          onFinalCapturePaths: (result) {
+                            Navigator.pop(ctx, result); // ← same ctx
+                            debugPrint(
+                              "Capture Paths -> ${result.frameImagePath}",
+                            );
+                            debugPrint("Captured Points -> ${result.corners}");
+                          },
+                          onFinalCapture: (result) {},
+                        ),
+                      ),
+                    ),
+                  );
+                },
+                child: const Text("Scan QR"),
+              ),
+            ),
+          ],
         ),
       ),
     );

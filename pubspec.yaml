@@ -13,6 +13,8 @@ dependencies:
   plugin_platform_interface: ^2.0.2
   ffi: ^2.1.4
   camera: ^0.11.3
+  path_provider: ^2.1.5
+  path: ^1.9.1
 
 dev_dependencies:
   flutter_test:
