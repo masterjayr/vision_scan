@@ -65,6 +65,11 @@ native/ios/Frameworks/
 native/ios/**/*.xcframework
 native/ios/**/*.framework
 
+# Windows (native) — build output and local OpenCV/ZXing libs (not shipped)
+native/windows/build/
+native/windows/libs/
+native/windows/.vs/
+
 # Prebuilt binaries
 *.so
 *.a

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -56,28 +58,43 @@ class _MyAppState extends State<MyApp> {
           children: [
             Builder(
               builder: (ctx) => OutlinedButton(
-                onPressed: () {
-                  Navigator.push(
-                    ctx, // ← ctx is inside MaterialApp, has Navigator
-                    MaterialPageRoute(
-                      builder: (_) => Scaffold(
-                        body: visionScan.buildQRScanner(
-                          stopOnDetect: false,
-                          onDetect: (text) {
-                            debugPrint("QR = $text");
-                          },
-                          onFinalCapturePaths: (result) {
-                            Navigator.pop(ctx, result); // ← same ctx
-                            debugPrint(
-                              "Capture Paths -> ${result.frameImagePath}",
-                            );
-                            debugPrint("Captured Points -> ${result.corners}");
-                          },
-                          onFinalCapture: (result) {},
+                onPressed: () async {
+                  if (Platform.isWindows) {
+                    final result = await visionScan.buildQRScannerWindows();
+                    if (result != null && result.success) {
+                      debugPrint("Captured: ${result.text}");
+                      debugPrint("Corners: ${result.corners}");
+                      debugPrint(
+                        "Frame JPEG length: ${result.frameJpeg.length}, Cropped: ${result.croppedJpeg.length}",
+                      );
+                    } else {
+                      debugPrint("Cancelled or no QR detected");
+                    }
+                  } else {
+                    Navigator.push(
+                      ctx, // ← ctx is inside MaterialApp, has Navigator
+                      MaterialPageRoute(
+                        builder: (_) => Scaffold(
+                          body: visionScan.buildQRScanner(
+                            stopOnDetect: false,
+                            onDetect: (text) {
+                              debugPrint("QR = $text");
+                            },
+                            onFinalCapturePaths: (result) {
+                              Navigator.pop(ctx, result); // ← same ctx
+                              debugPrint(
+                                "Capture Paths -> ${result.frameImagePath}",
+                              );
+                              debugPrint(
+                                "Captured Points -> ${result.corners}",
+                              );
+                            },
+                            onFinalCapture: (result) {},
+                          ),
                         ),
                       ),
-                    ),
-                  );
+                    );
+                  }
                 },
                 child: const Text("Scan QR"),
               ),

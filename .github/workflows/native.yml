@@ -112,3 +112,53 @@ jobs:
             dist/android/android-x86_64.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  windows-native:
+    name: Build Windows native DLL
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Ensure MSVC tools (cl/link) are available for CMake's Visual Studio generator.
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Build Windows native DLL (download deps + build)
+        shell: bash
+        env:
+          # Use Windows CMake (Android SDK cmake can't generate Visual Studio projects).
+          CMAKE_EXE: C:/Program Files/CMake/bin/cmake.exe
+          OPENCV_ZIP_URL: https://github.com/masterjayr/scanner-binaries/releases/download/opencv-windowsv1.0.0/opencv-windows.zip
+        run: |
+          bash scripts/build_windows.sh
+
+      - name: Package Windows DLLs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force dist/windows | Out-Null
+
+          $dllDir = "example/build/windows/x64/runner/Debug"
+          $outZip = "dist/windows/windows-x64.zip"
+
+          Copy-Item "$dllDir/vision_scan_native.dll" "dist/windows/" -Force
+
+          # Include OpenCV runtime DLL if present (required at runtime).
+          $opencvDll = Get-ChildItem $dllDir -Filter "opencv_world*.dll" | Select-Object -First 1
+          if ($null -ne $opencvDll) {
+            Copy-Item $opencvDll.FullName "dist/windows/" -Force
+          }
+
+          Compress-Archive -Path "dist/windows/*" -DestinationPath $outZip -Force
+
+      - name: Upload Windows DLL to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/windows/windows-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

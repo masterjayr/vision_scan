@@ -2,6 +2,14 @@
 
 #include <stdint.h>
 
+#if defined(_WIN32) && !defined(VISION_SCAN_NATIVE_EXPORT)
+#define VISION_SCAN_NATIVE_EXPORT __declspec(dllimport)
+#elif defined(_WIN32)
+#define VISION_SCAN_NATIVE_EXPORT __declspec(dllexport)
+#else
+#define VISION_SCAN_NATIVE_EXPORT
+#endif
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -39,18 +47,23 @@ extern "C"
     // Returns a newly-allocated UTF-8 string (null-terminated) with the decoded QR text,
     // or nullptr if not found.
     // Caller MUST free the returned string using free_qr_string().
-    QRResult decode_qr_gray(
+    VISION_SCAN_NATIVE_EXPORT QRResult decode_qr_gray(
         uint8_t *grayData,
         int width,
         int height);
 
-    VSFrameResult detect_qr_from_gray(const uint8_t *gray, int32_t width, int32_t height);
+    VISION_SCAN_NATIVE_EXPORT VSFrameResult detect_qr_from_gray(const uint8_t *gray, int32_t width, int32_t height);
 
-    VSFinalResult capture_qr_from_gray(const uint8_t *gray, int32_t width, int32_t height);
+    VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_gray(const uint8_t *gray, int32_t width, int32_t height);
 
     // Frees a string returned by decode_qr_gray().
-    void free_qr_string(char *p);
-    void free_qr_bytes(uint8_t *p);
+    VISION_SCAN_NATIVE_EXPORT void free_qr_string(char *p);
+    VISION_SCAN_NATIVE_EXPORT void free_qr_bytes(uint8_t *p);
+
+#ifdef _WIN32
+    // Windows-only: opens camera, preview, draw box, stabilize; returns VSFinalResult.
+    VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_camera_windows(void);
+#endif
 
 #ifdef __cplusplus
 } // extern "C"

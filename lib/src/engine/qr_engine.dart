@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:vision_scan/src/engine/qr_isolate.dart';
 import 'package:vision_scan/src/models/final_capture_result.dart';
 import 'package:vision_scan/src/models/frame_detection_result.dart';
@@ -26,6 +28,33 @@ class QrEngine {
 
   static String? decodeQRCode(Uint8List grayBytes, int width, int height) {
     return NativeBindings.decodeQR(grayBytes, width, height);
+  }
+
+  static int windowsPrint() {
+    return NativeBindings.pingWindows();
+  }
+
+  static int windowsOpenCvTest() {
+    return NativeBindings.opencvTestWindows();
+  }
+
+  static int windowsZxingTest() {
+    return NativeBindings.zxingTestWindows();
+  }
+
+  /// Windows-only: opens native camera, preview + box + stabilize, returns same type as captureFromGray.
+  static Future<FinalCaptureResult?> captureFromCameraWindows() async {
+    if (!Platform.isWindows) return null;
+    final r = await Future(() => NativeBindings.captureFromCameraWindows());
+    if (r == null) return null;
+    return FinalCaptureResult(
+      success: r.success,
+      decoded: r.decoded,
+      text: r.text,
+      corners: r.corners,
+      croppedJpeg: r.croppedJpeg.toList(),
+      frameJpeg: r.frameJpeg.toList(),
+    );
   }
 
   /// Sends gray frame to the isolate for detection.

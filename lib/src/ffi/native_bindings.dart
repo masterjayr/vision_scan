@@ -88,6 +88,20 @@ class NativeBindings {
         void Function(ffi.Pointer<ffi.Uint8>)
       >("free_qr_bytes");
 
+  static final ping = _lib.lookupFunction<ffi.Int32 Function(), int Function()>(
+    "vision_scan_ping",
+  );
+
+  static final _opencvTest =
+      _lib.lookupFunction<ffi.Int32 Function(), int Function()>(
+    "vision_scan_opencv_test",
+  );
+
+  static final _zxingTest =
+      _lib.lookupFunction<ffi.Int32 Function(), int Function()>(
+    "vision_scan_zxing_test",
+  );
+
   static ffi.DynamicLibrary _open() {
     if (Platform.isAndroid) {
       return ffi.DynamicLibrary.open('libvision_scan_native.so');
@@ -95,6 +109,10 @@ class NativeBindings {
 
     if (Platform.isIOS) {
       return ffi.DynamicLibrary.process();
+    }
+
+    if (Platform.isWindows) {
+      return ffi.DynamicLibrary.open("vision_scan_native.dll");
     }
 
     throw UnsupportedError("This demo only supports Android/iOS for now.");
@@ -114,6 +132,18 @@ class NativeBindings {
 
     malloc.free(ptr);
     return text;
+  }
+
+  static int pingWindows() {
+    return ping();
+  }
+
+  static int opencvTestWindows() {
+    return _opencvTest();
+  }
+
+  static int zxingTestWindows() {
+    return _zxingTest();
   }
 
   static List<Offset> _cornersToOffsets(ffi.Array<ffi.Float> c) {
@@ -167,6 +197,33 @@ class NativeBindings {
 
     return FinalCapture(
       success: res.success == 1,
+      decoded: res.decoded == 1,
+      text: text,
+      corners: corners,
+      croppedJpeg: cropped,
+      frameJpeg: frame,
+    );
+  }
+
+  /// Windows-only: opens native camera window, detects QR, stabilizes, returns same type as captureFromGray.
+  static FinalCapture? captureFromCameraWindows() {
+    if (!Platform.isWindows) return null;
+    final fn = _lib.lookupFunction<VSFinalResult Function(), VSFinalResult Function()>(
+      'capture_qr_from_camera_windows',
+    );
+    final res = fn();
+    if (res.success != 1) {
+      if (res.text != ffi.nullptr) _freeString(res.text);
+      if (res.frame_len > 0 && res.frame_jpeg != ffi.nullptr) _freeBytes(res.frame_jpeg);
+      if (res.cropped_len > 0 && res.cropped_jpeg != ffi.nullptr) _freeBytes(res.cropped_jpeg);
+      return null;
+    }
+    final corners = _cornersToOffsets(res.corners);
+    final text = _readAndFreeText(res.text);
+    final cropped = _copyAndFreeBytes(res.cropped_jpeg, res.cropped_len);
+    final frame = _copyAndFreeBytes(res.frame_jpeg, res.frame_len);
+    return FinalCapture(
+      success: true,
       decoded: res.decoded == 1,
       text: text,
       corners: corners,
