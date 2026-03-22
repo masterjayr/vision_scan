@@ -42,6 +42,22 @@ class QrEngine {
     return NativeBindings.zxingTestWindows();
   }
 
+  /// Decode-only: gray buffer → first successful QR string ([VSScanResult] / [scan_qr_from_gray]).
+  static Future<String?> scanFromGray(
+    Uint8List gray,
+    int width,
+    int height,
+  ) async {
+    if (_isolate == null) return null;
+    return _isolate!.scanFromGray(gray, width, height);
+  }
+
+  /// Windows-only: native OpenCV window, first successful decode (Esc cancels).
+  static Future<String?> scanWindows() async {
+    if (!Platform.isWindows) return null;
+    return Future(() => NativeBindings.scanWindows());
+  }
+
   /// Windows-only: opens native camera, preview + box + stabilize, returns same type as captureFromGray.
   static Future<FinalCaptureResult?> captureFromCameraWindows() async {
     if (!Platform.isWindows) return null;

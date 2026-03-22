@@ -184,6 +184,18 @@ VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_gray(const uint8_t* gray
     return out;
 }
 
+VISION_SCAN_NATIVE_EXPORT VSScanResult scan_qr_from_gray(const uint8_t* gray, int32_t width, int32_t height) {
+    VSScanResult out{};
+    out.success = 0;
+    out.text = nullptr;
+    if (!gray || width <= 0 || height <= 0)
+        return out;
+    QRResult qr = decode_qr_from_gray(const_cast<uint8_t*>(gray), width, height);
+    out.success = qr.success;
+    out.text = qr.text;
+    return out;
+}
+
 VISION_SCAN_NATIVE_EXPORT void free_qr_string(char* p) {
     if (p) std::free(p);
 }
@@ -212,8 +224,8 @@ VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_camera_windows(void) {
     if (!cap.isOpened())
         return out;
 
-    cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 960);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
 
     ZXing::DecodeHints hints;
     hints.setFormats(ZXing::BarcodeFormat::QRCode);
@@ -287,6 +299,57 @@ VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_camera_windows(void) {
             }
             break;
         }
+    }
+
+    cap.release();
+    cv::destroyAllWindows();
+    return out;
+}
+
+VISION_SCAN_NATIVE_EXPORT VSScanResult scan_qr_windows(void) {
+    VSScanResult out{};
+    out.success = 0;
+    out.text = nullptr;
+
+    cv::VideoCapture cap(0, cv::CAP_MSMF);
+    if (!cap.isOpened()) {
+        cap.release();
+        cap.open(0, cv::CAP_DSHOW);
+    }
+    if (!cap.isOpened())
+        return out;
+
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 960);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
+
+    ZXing::DecodeHints hints;
+    hints.setFormats(ZXing::BarcodeFormat::QRCode);
+    hints.setTryHarder(true);
+
+    cv::Mat frame, gray;
+    cv::namedWindow("QR Scan", cv::WINDOW_NORMAL);
+
+    while (true) {
+        if (!cap.read(frame) || frame.empty()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            continue;
+        }
+        cv::cvtColor(frame, gray, cv::COLOR_BGR2GRAY);
+
+        ZXing::ImageView iv(gray.data, gray.cols, gray.rows, ZXing::ImageFormat::Lum);
+        auto result = ZXing::ReadBarcode(iv, hints);
+        if (result.isValid()) {
+            auto txt = result.text();
+            if (!txt.empty()) {
+                out.success = 1;
+                out.text = dup_cstr(txt);
+                break;
+            }
+        }
+
+        cv::imshow("QR Scan", frame);
+        if (cv::waitKey(1) == 27)
+            break;
     }
 
     cap.release();

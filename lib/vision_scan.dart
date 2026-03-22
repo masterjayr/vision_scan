@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:vision_scan/src/camera/qr_scanner_view.dart';
+import 'package:vision_scan/src/camera/simple_qr_scan_page.dart';
 import 'package:vision_scan/src/engine/qr_engine.dart';
 import 'package:vision_scan/src/models/final_capture_paths_result.dart';
 import 'package:vision_scan/src/models/final_capture_result.dart';
@@ -31,6 +32,20 @@ class VisionScan {
   Future<FinalCaptureResult?> buildQRScannerWindows() async {
     if (!Platform.isWindows) return null;
     return QrEngine.captureFromCameraWindows();
+  }
+
+  /// Windows-only: native camera + decode first QR string ([scan_qr_windows] / [VSScanResult]).
+  Future<String?> scanWindows() async {
+    if (!Platform.isWindows) return null;
+    return QrEngine.scanWindows();
+  }
+
+  /// Android / iOS: Flutter camera → gray → [scan_qr_from_gray]. Returns decoded text or null if dismissed.
+  Future<String?> scan(BuildContext context) async {
+    if (Platform.isWindows) return null;
+    return Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const SimpleQrScanPage()),
+    );
   }
 
   Widget buildQRScanner({

@@ -25,6 +25,18 @@ base class VSFrameResult extends ffi.Struct {
   external ffi.Pointer<ffi.Char> text;
 }
 
+base class VSScanResult extends ffi.Struct {
+  @ffi.Int32()
+  external int success;
+
+  external ffi.Pointer<ffi.Char> text;
+}
+
+/// Native / Dart signatures for [scan_qr_windows] (struct return avoids `>` parse issues in generics).
+typedef ScanQrWindowsNative = VSScanResult Function();
+
+typedef ScanQrWindowsDart = VSScanResult Function();
+
 base class VSFinalResult extends ffi.Struct {
   @ffi.Int32()
   external int success;
@@ -76,6 +88,13 @@ class NativeBindings {
         VSFinalResult Function(ffi.Pointer<ffi.Uint8>, int, int)
       >("capture_qr_from_gray");
 
+  static final VSScanResult Function(ffi.Pointer<ffi.Uint8>, int, int)
+  _scanFromGray = _lib
+      .lookupFunction<
+        VSScanResult Function(ffi.Pointer<ffi.Uint8>, ffi.Int32, ffi.Int32),
+        VSScanResult Function(ffi.Pointer<ffi.Uint8>, int, int)
+      >('scan_qr_from_gray');
+
   static final void Function(ffi.Pointer<ffi.Char>) _freeString = _lib
       .lookupFunction<
         ffi.Void Function(ffi.Pointer<ffi.Char>),
@@ -115,7 +134,28 @@ class NativeBindings {
       return ffi.DynamicLibrary.open("vision_scan_native.dll");
     }
 
-    throw UnsupportedError("This demo only supports Android/iOS for now.");
+    throw UnsupportedError(
+      'vision_scan FFI supports Android, iOS, and Windows.',
+    );
+  }
+
+  /// Simple decode-only API; frees native text via [free_qr_string].
+  static String? scanFromGray(Uint8List grayBytes, int width, int height) {
+    final ptr = malloc<ffi.Uint8>(grayBytes.length);
+    ptr.asTypedList(grayBytes.length).setAll(0, grayBytes);
+
+    final res = _scanFromGray(ptr, width, height);
+
+    String? text;
+    if (res.success == 1 && res.text != ffi.nullptr) {
+      text = res.text.cast<Utf8>().toDartString();
+      _freeString(res.text);
+    } else if (res.text != ffi.nullptr) {
+      _freeString(res.text);
+    }
+
+    malloc.free(ptr);
+    return text;
   }
 
   static String? decodeQR(Uint8List grayBytes, int width, int height) {
@@ -203,6 +243,23 @@ class NativeBindings {
       croppedJpeg: cropped,
       frameJpeg: frame,
     );
+  }
+
+  /// Windows-only: OpenCV camera, first successful ZXing decode (or cancel with Esc).
+  static String? scanWindows() {
+    if (!Platform.isWindows) return null;
+    final fn = _lib.lookupFunction<ScanQrWindowsNative, ScanQrWindowsDart>(
+      'scan_qr_windows',
+    );
+    final res = fn();
+    String? text;
+    if (res.success == 1 && res.text != ffi.nullptr) {
+      text = res.text.cast<Utf8>().toDartString();
+      _freeString(res.text);
+    } else if (res.text != ffi.nullptr) {
+      _freeString(res.text);
+    }
+    return text;
   }
 
   /// Windows-only: opens native camera window, detects QR, stabilizes, returns same type as captureFromGray.

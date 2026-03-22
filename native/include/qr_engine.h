@@ -44,10 +44,18 @@ extern "C"
         char *text;
         int success;
     } QRResult;
+
+    /** Simple decode-only result (QR text). Used by scan_qr_from_gray and scan_qr_windows. */
+    typedef struct VSScanResult
+    {
+        int32_t success; /**< 1 if a QR was decoded */
+        char *text;      /**< UTF-8, owned; free with free_qr_string */
+    } VSScanResult;
+
     // Returns a newly-allocated UTF-8 string (null-terminated) with the decoded QR text,
     // or nullptr if not found.
     // Caller MUST free the returned string using free_qr_string().
-    VISION_SCAN_NATIVE_EXPORT QRResult decode_qr_gray(
+    VISION_SCAN_NATIVE_EXPORT QRResult decode_qr_from_gray(
         uint8_t *grayData,
         int width,
         int height);
@@ -56,13 +64,22 @@ extern "C"
 
     VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_gray(const uint8_t *gray, int32_t width, int32_t height);
 
-    // Frees a string returned by decode_qr_gray().
+    /** Decode QR from an 8-bit grayscale buffer (same layout as other gray APIs). */
+    VISION_SCAN_NATIVE_EXPORT VSScanResult scan_qr_from_gray(
+        const uint8_t *gray,
+        int32_t width,
+        int32_t height);
+
+    // Frees a string returned by decode_qr_from_gray().
     VISION_SCAN_NATIVE_EXPORT void free_qr_string(char *p);
     VISION_SCAN_NATIVE_EXPORT void free_qr_bytes(uint8_t *p);
 
 #ifdef _WIN32
     // Windows-only: opens camera, preview, draw box, stabilize; returns VSFinalResult.
     VISION_SCAN_NATIVE_EXPORT VSFinalResult capture_qr_from_camera_windows(void);
+
+    /** Windows-only: OpenCV camera + ZXing; returns first successful decode (or ESC to cancel). */
+    VISION_SCAN_NATIVE_EXPORT VSScanResult scan_qr_windows(void);
 #endif
 
 #ifdef __cplusplus

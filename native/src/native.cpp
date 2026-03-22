@@ -51,6 +51,19 @@ extern "C"
         return out;
     }
 
+    VSScanResult scan_qr_from_gray(const uint8_t *gray, int32_t width, int32_t height)
+    {
+        VSScanResult out{};
+        out.success = 0;
+        out.text = nullptr;
+        if (!gray || width <= 0 || height <= 0)
+            return out;
+        QRResult qr = decode_qr_from_gray(const_cast<uint8_t *>(gray), width, height);
+        out.success = qr.success;
+        out.text = qr.text;
+        return out;
+    }
+
     static char *dup_cstr(const std::string &s)
     {
         if (s.empty())

@@ -82,6 +82,7 @@ class _MyAppState extends State<MyApp> {
                             },
                             onFinalCapturePaths: (result) {
                               Navigator.pop(ctx, result); // ← same ctx
+                              
                               debugPrint(
                                 "Capture Paths -> ${result.frameImagePath}",
                               );
@@ -97,6 +98,27 @@ class _MyAppState extends State<MyApp> {
                   }
                 },
                 child: const Text("Scan QR"),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Builder(
+              builder: (ctx) => OutlinedButton(
+                onPressed: () async {
+                  if (Platform.isWindows) {
+                    final text = await visionScan.scanWindows();
+                    debugPrint(
+                      text != null
+                          ? 'scan_windows: $text'
+                          : 'scan_windows: cancelled or no QR',
+                    );
+                  } else {
+                    final text = await visionScan.scan(ctx);
+                    debugPrint(
+                      text != null ? 'scan: $text' : 'scan: cancelled',
+                    );
+                  }
+                },
+                child: const Text('Simple scan (decode only)'),
               ),
             ),
           ],

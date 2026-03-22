@@ -4,7 +4,7 @@ import 'dart:ui';
 
 import 'package:vision_scan/src/ffi/native_bindings.dart';
 
-enum _Op { detect, capture, decode }
+enum _Op { detect, capture, decode, scan }
 
 class QrIsolate {
   late final Isolate _isolate;
@@ -35,6 +35,13 @@ class QrIsolate {
       if (msg.op == _Op.decode) {
         final result = NativeBindings.decodeQR(msg.gray, msg.width, msg.height);
 
+        msg.reply.send(result);
+      } else if (msg.op == _Op.scan) {
+        final result = NativeBindings.scanFromGray(
+          msg.gray,
+          msg.width,
+          msg.height,
+        );
         msg.reply.send(result);
       } else if (msg.op == _Op.detect) {
         final result = NativeBindings.detectFromGray(
@@ -68,6 +75,17 @@ class QrIsolate {
         );
       }
     });
+  }
+
+  /// [scan_qr_from_gray] on the isolate thread (decode-only string).
+  Future<String?> scanFromGray(Uint8List gray, int width, int height) async {
+    final response = ReceivePort();
+
+    _sendPort.send(
+      _WorkMessage(_Op.scan, gray, width, height, response.sendPort),
+    );
+
+    return await response.first as String?;
   }
 
   Future<String?> decode(Uint8List gray, int width, int height) async {
