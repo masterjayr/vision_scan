@@ -40,6 +40,43 @@ ensure_tools() {
   need_cmd curl
 }
 
+# Resolves ANDROID_NDK_HOME to a path that contains build/cmake/android.toolchain.cmake.
+# On macOS the NDK lives under the SDK, e.g. ~/Library/Android/sdk/ndk/<version>.
+# If ANDROID_NDK_HOME is wrong (e.g. /ndk/...), fall back to ANDROID_HOME / ANDROID_SDK_ROOT.
+resolve_android_ndk_home() {
+  local toolchain
+  if [[ -n "${ANDROID_NDK_HOME:-}" ]]; then
+    toolchain="${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake"
+    if [[ -f "$toolchain" ]]; then
+      echo "$ANDROID_NDK_HOME"
+      return 0
+    fi
+    echo "⚠️  ANDROID_NDK_HOME is set but invalid: ${ANDROID_NDK_HOME}" >&2
+    echo "    (missing: $toolchain)" >&2
+  fi
+
+  local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+  if [[ -z "$sdk" || ! -d "$sdk/ndk" ]]; then
+    echo "❌ Could not find the Android NDK." >&2
+    echo "   Install the NDK via Android Studio SDK Manager, then either:" >&2
+    echo "   • export ANDROID_HOME=\"\$HOME/Library/Android/sdk\"   # typical on macOS" >&2
+    echo "   • export ANDROID_NDK_HOME=\"\$ANDROID_HOME/ndk/<version>\"" >&2
+    exit 1
+  fi
+
+  local -a candidates=()
+  local d
+  for d in "$sdk"/ndk/*; do
+    [[ -d "$d" && -f "$d/build/cmake/android.toolchain.cmake" ]] && candidates+=("$d")
+  done
+  if [[ ${#candidates[@]} -eq 0 ]]; then
+    echo "❌ No usable NDK under $sdk/ndk (need build/cmake/android.toolchain.cmake)." >&2
+    exit 1
+  fi
+
+  printf '%s\n' "${candidates[@]}" | sort -V | tail -1
+}
+
 clone_or_update_repo() {
   local url="$1"
   local ref="$2"
@@ -55,7 +92,9 @@ clone_or_update_repo() {
     log "Updating ZXing"
     git -C "$dest" fetch --all --tags
     git -C "$dest" checkout "$ref"
-    git -C "$dest" pull --ff-only || true
+    if git -C "$dest" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1; then
+      git -C "$dest" pull --ff-only
+    fi
     git -C "$dest" submodule update --init --recursive
   fi
 }
@@ -272,7 +311,9 @@ copy_example_outputs_one() {
 # -------------------------------------------------
 main() {
   ensure_tools
-  [[ -n "${ANDROID_NDK_HOME:-}" ]] || { echo "❌ ANDROID_NDK_HOME not set"; exit 1; }
+  ANDROID_NDK_HOME="$(resolve_android_ndk_home)"
+  export ANDROID_NDK_HOME
+  log "Using ANDROID_NDK_HOME=$ANDROID_NDK_HOME"
 
   ensure_opencv_android
   copy_opencv_headers

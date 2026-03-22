@@ -73,6 +73,7 @@ class _SimpleQrScanPageState extends State<SimpleQrScanPage> {
         );
         if (text != null && mounted) {
           _done = true;
+          setState(() {});
           await _stopCamera();
           if (mounted) Navigator.of(context).pop<String>(text);
           return;
@@ -84,17 +85,19 @@ class _SimpleQrScanPageState extends State<SimpleQrScanPage> {
     _isProcessing = false;
   }
 
-  Future<void> _stopCamera() async {
-    try {
-      await _controller?.stopImageStream();
-      await _controller?.dispose();
-    } catch (_) {}
+  Future<void> _stopCamera({bool notify = true}) async {
+    final controller = _controller;
     _controller = null;
+    if (notify && mounted) setState(() {});
+    try {
+      await controller?.stopImageStream();
+      await controller?.dispose();
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    _stopCamera();
+    _stopCamera(notify: false);
     super.dispose();
   }
 
@@ -105,7 +108,9 @@ class _SimpleQrScanPageState extends State<SimpleQrScanPage> {
       appBar: AppBar(
         title: const Text('Scan QR (decode only)'),
       ),
-      body: c == null || !c.value.isInitialized
+      body: _done ||
+              c == null ||
+              !c.value.isInitialized
           ? const Center(child: CircularProgressIndicator())
           : Stack(
               fit: StackFit.expand,
