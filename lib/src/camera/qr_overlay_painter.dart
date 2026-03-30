@@ -14,7 +14,8 @@ class QrOverlayPainter extends CustomPainter {
 
     final paint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3;
+      ..strokeWidth = 3
+      ..color = const Color(0xFF00C853); // material green accent
 
     final path = Path()
       ..moveTo(points[0].dx, points[0].dy)
@@ -25,7 +26,10 @@ class QrOverlayPainter extends CustomPainter {
 
     canvas.drawPath(path, paint);
 
-    final dot = Paint()..style = PaintingStyle.fill;
+    final dot = Paint()
+      ..style = PaintingStyle.fill
+      ..color = const Color(0xFF00C853); // same green for corner dots
+
     for (final p in points) {
       canvas.drawCircle(p, 4, dot);
     }

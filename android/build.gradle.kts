@@ -2,7 +2,7 @@ import java.net.URL
 import java.util.zip.ZipInputStream
 
 group = "com.vision.scan.vision_scan"
-version = "0.0.6"
+version = "0.0.7"
 
 plugins {
     id("com.android.library")

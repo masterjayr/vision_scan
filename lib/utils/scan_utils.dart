@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 
 class FittedRect {
@@ -44,9 +45,7 @@ FittedRect fittedContainRect(Size input, Size output) {
   return FittedRect(input, output, Rect.fromLTWH(left, top, drawW, drawH));
 }
 
-/// Scale to fill output height and center horizontally when possible. Use when
-/// the camera preview fills height with letterbox on the sides. If filling height
-/// would make width exceed the widget, falls back to contain so the rect stays inside.
+/// Scale to fill output height and center horizontally when possible.
 FittedRect fittedRectFillHeight(Size input, Size output) {
   final scaleH = output.height / input.height;
   final scaleW = output.width / input.width;
@@ -66,9 +65,10 @@ FittedRect fittedRectFillHeight(Size input, Size output) {
 }
 
 /// Transforms a point from raw camera image coordinates to display coordinates.
-/// The camera image stream comes in sensor orientation (often landscape).
-/// The CameraPreview displays it rotated to match the device. This converts
-/// image (x,y) to the coordinate system of what the user actually sees.
+///
+/// iOS delivers BGRA frames already in portrait/display orientation even though
+/// sensorOrientation reports 90 — passing isIOS=true skips rotation entirely
+/// so corners are not double-rotated.
 Offset imagePointToDisplay({
   required Offset imagePoint,
   required double imageWidth,
@@ -81,9 +81,10 @@ Offset imagePointToDisplay({
   final w = imageWidth;
   final h = imageHeight;
 
-  // iOS delivers frames already in portrait orientation — no rotation needed
+  // iOS frames are already in display orientation — no rotation needed.
   if (isIOS) return Offset(x, y);
 
+  // Android frames come in sensor orientation and must be rotated.
   switch (sensorOrientation) {
     case 90:
       return Offset(y, w - x);
@@ -98,15 +99,19 @@ Offset imagePointToDisplay({
 }
 
 /// Returns the display dimensions for the rotated preview.
+///
+/// iOS frames are already portrait — no swap needed regardless of
+/// sensorOrientation. Android frames at 90/270 need width/height swapped.
 Size displaySizeFromImage({
   required double imageWidth,
   required double imageHeight,
   required int sensorOrientation,
   bool isIOS = false,
 }) {
-  // iOS frame is already portrait — dimensions are correct as-is
+  // iOS: frame already portrait — dimensions are correct as-is.
   if (isIOS) return Size(imageWidth, imageHeight);
 
+  // Android: sensor rotated 90/270 so swap to get display dimensions.
   if (sensorOrientation == 90 || sensorOrientation == 270) {
     return Size(imageHeight, imageWidth);
   }
@@ -114,11 +119,13 @@ Size displaySizeFromImage({
 }
 
 /// Maps a point from camera image space to widget space.
-/// [imageSize] – size of the frame we're detecting in (image.width x image.height).
-/// [widgetSize] – size of the overlay/canvas.
+///
+/// [imageSize]         – dimensions of the raw camera frame.
+/// [widgetSize]        – dimensions of the overlay canvas.
 /// [sensorOrientation] – camera sensor orientation (0, 90, 180, 270).
-/// [previewSize] – optional; when provided, fit uses preview aspect so the overlay
-///   matches the preview (avoids slim/stretched box). Point is scaled image→preview when needed.
+/// [previewSize]       – when provided, fitting uses preview aspect ratio so
+///                       the overlay matches the CameraPreview exactly.
+/// [isIOS]             – pass Platform.isIOS to skip redundant rotation on iOS.
 Offset mapImageToWidget({
   required Offset imagePoint,
   required Size imageSize,
@@ -132,14 +139,14 @@ Offset mapImageToWidget({
     imageWidth: imageSize.width,
     imageHeight: imageSize.height,
     sensorOrientation: sensorOrientation,
-    isIOS: isIOS, // ← pass through
+    isIOS: isIOS,
   );
 
   final imageDisplaySize = displaySizeFromImage(
     imageWidth: imageSize.width,
     imageHeight: imageSize.height,
     sensorOrientation: sensorOrientation,
-    isIOS: isIOS, // ← pass through
+    isIOS: isIOS,
   );
 
   final Size displaySizeForFit;
@@ -153,6 +160,7 @@ Offset mapImageToWidget({
       imageWidth: previewSize.width,
       imageHeight: previewSize.height,
       sensorOrientation: sensorOrientation,
+      isIOS: isIOS,
     );
     px = displayPoint.dx * (displaySizeForFit.width / imageDisplaySize.width);
     py = displayPoint.dy * (displaySizeForFit.height / imageDisplaySize.height);
@@ -162,7 +170,6 @@ Offset mapImageToWidget({
     py = displayPoint.dy;
   }
 
-  // Fill height + center width: correct left-right, overlay reaches top and bottom
   final fit = fittedCoverRect(displaySizeForFit, widgetSize);
   final scaleX = fit.dst.width / displaySizeForFit.width;
   final scaleY = fit.dst.height / displaySizeForFit.height;
@@ -170,23 +177,16 @@ Offset mapImageToWidget({
   return Offset(fit.dst.left + px * scaleX, fit.dst.top + py * scaleY);
 }
 
-bool isStableCorners(
-  List<Offset> prev,
-  List<Offset> cur, {
-  double maxAvgDeltaPx = 4.0,
-}) {
-  if (prev.length != 4 || cur.length != 4) return false;
-
-  double sum = 0;
-
-  for (int i = 0; i < 4; i++) {
-    sum += (prev[i] - cur[i]).distance;
-  }
-  final avg = sum / 4.0;
-
-  return avg <= maxAvgDeltaPx;
-}
-
+/// Checks whether corners look like a plausible QR detection.
+///
+/// IMPORTANT: always pass widget-space corners (newWidgetCorners) not
+/// image-space corners (detection.corners). Widget space is always roughly
+/// 390x844 on a typical phone regardless of camera resolution — so the
+/// threshold is resolution-independent and works correctly on both platforms.
+///
+/// A QR filling ~10% of a 390x844 screen has area ≈ 3200.
+/// Threshold of 1500 catches small QR codes while rejecting degenerate
+/// near-zero detections from ZXing noise.
 bool cornersLookValid(List<Offset> c) {
   if (c.length != 4) return false;
 
@@ -198,10 +198,32 @@ bool cornersLookValid(List<Offset> c) {
   }
   area = area.abs() / 2.0;
 
-  return area > 2000; // adjust based on resolution.
+  // Widget-space threshold — resolution independent.
+  return area > 1500;
 }
 
-/// Average distance (in same units as points) between previous and current corners.
+/// Returns true if the average distance between previous and current corners
+/// is within [maxAvgDeltaPx] pixels (widget-space).
+///
+/// 6px is tight — the user must genuinely hold still.
+/// Raise toward 10-12 if capture feels too hard to trigger.
+bool isStableCorners(
+  List<Offset> prev,
+  List<Offset> cur, {
+  double maxAvgDeltaPx = 6.0,
+}) {
+  if (prev.length != 4 || cur.length != 4) return false;
+
+  double sum = 0;
+  for (int i = 0; i < 4; i++) {
+    sum += (prev[i] - cur[i]).distance;
+  }
+  final avg = sum / 4.0;
+
+  return avg <= maxAvgDeltaPx;
+}
+
+/// Average distance (widget-space pixels) between previous and current corners.
 double averageCornerDelta(List<Offset> previous, List<Offset> current) {
   if (previous.length != 4 || current.length != 4) return 0;
   double sum = 0;
@@ -211,11 +233,17 @@ double averageCornerDelta(List<Offset> previous, List<Offset> current) {
   return sum / 4;
 }
 
+/// Blends previous corner positions toward current using exponential smoothing.
+///
+/// alpha=0.75 (iOS)    : gentle glide — hardware is fast and consistent.
+/// alpha=0.92 (Android): near-instant snap — avoids blending from stale positions.
+///
+/// 0.0 → fully old position (frozen)
+/// 1.0 → fully new position (no smoothing)
 List<Offset> smoothCorners(
   List<Offset> previous,
   List<Offset> current, {
-  double alpha =
-      0.92, // 0.0 → old only, 1.0 → new only (higher = more reactive)
+  double alpha = 0.92,
 }) {
   if (previous.length != 4 || current.length != 4) return current;
 

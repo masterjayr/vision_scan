@@ -38,34 +38,34 @@ class _QRScannerViewState extends State<QrScannerView> {
   bool _isCapturing = false;
   bool _foundFinal = false;
 
-  // ── Overlay ──────────────────────────────────────────────────────────────
-  // _displayCorners: what the painter actually draws (smoothed, widget-space).
-  // _rawImageCorners: last corners in image-space, used for stability check.
+  // ── Overlay ───────────────────────────────────────────────────────────────
+  // _displayCorners    : what the painter draws (smoothed, widget-space)
+  // _stableCheckCorners: widget-space corners used for the stability gate
   List<Offset> _displayCorners = const [];
   List<Offset> _stableCheckCorners = const [];
 
-  // How many frames in a row we got no detection — used only to clear the box.
+  // Consecutive missed frames before the overlay box is cleared.
+  // Android drops more frames than iOS so we give it more headroom.
   int _missedFrames = 0;
+  int get _missedFramesToClear => Platform.isAndroid ? 8 : 5;
 
-  // Clear the box after this many consecutive missed frames.
-  // Keep this low so the box disappears quickly when the QR leaves frame,
-  // but not so low that a single bad frame flickers it off.
-  static const int _missedFramesToClear = 5;
-
-  // ── Capture stability ────────────────────────────────────────────────────
+  // ── Capture stability ─────────────────────────────────────────────────────
   int _stableCount = 0;
   static const int _stableNeeded = 40;
 
   int _unstableFrames = 0;
-  static const int _stableResetGap = 15;
+  // Android needs a longer reset gap because detection is less consistent.
+  int get _stableResetGap => Platform.isAndroid ? 20 : 15;
 
-  // ── Frame pipeline ───────────────────────────────────────────────────────
+  // ── Frame pipeline ────────────────────────────────────────────────────────
   Size _overlaySize = Size.zero;
   Size _previewSize = Size.zero;
 
-  CameraImage? _latestImage;
+  // Single flag — if true we are mid-processing and incoming frames are dropped.
+  // This guarantees we always process the freshest frame, never a stale queued one.
   bool _isProcessing = false;
 
+  // Best-frame tracking for capture quality
   double _bestDelta = double.infinity;
   Uint8List? _bestGray;
   int _bestW = 0;
@@ -90,6 +90,8 @@ class _QRScannerViewState extends State<QrScannerView> {
 
     _controller = CameraController(
       backCamera,
+      // iOS gets high resolution — hardware is capable and benefits from it.
+      // Android stays at medium — better isolate throughput = smoother overlay.
       Platform.isIOS ? ResolutionPreset.high : ResolutionPreset.medium,
       enableAudio: false,
       imageFormatGroup: Platform.isAndroid
@@ -104,137 +106,142 @@ class _QRScannerViewState extends State<QrScannerView> {
     await _controller!.startImageStream(_onFrame);
   }
 
-  // Called on every camera frame — just stores the latest and kicks the loop.
+  // Called on every camera frame.
+  // If we are still processing the previous frame we drop this one entirely —
+  // we never queue frames. This guarantees the box always reflects the current
+  // camera view, not a frame from several renders ago.
   void _onFrame(CameraImage image) {
-    _latestImage = image;
-    if (!_isProcessing) {
-      _isProcessing = true;
-      _processLatest();
-    }
+    if (_isProcessing) return; // busy — drop frame, never queue
+    _isProcessing = true;
+    _processFrame(image); // process THIS frame right now
   }
 
-  Future<void> _processLatest() async {
-    while (_latestImage != null) {
-      final image = _latestImage!;
-      _latestImage = null;
+  Future<void> _processFrame(CameraImage image) async {
+    try {
+      if ((widget.stopOnDetect && _foundFinal) || _isCapturing) return;
+      if (!QrEngine.isReady) return;
 
-      if ((widget.stopOnDetect && _foundFinal) || _isCapturing) continue;
-      if (!QrEngine.isReady) continue;
+      final gray = Platform.isAndroid
+          ? androidYPlaneToGray(image)
+          : bgraToGray(image);
 
-      try {
-        final gray = Platform.isAndroid
-            ? androidYPlaneToGray(image)
-            : bgraToGray(image);
+      // Returns null if isolate is still busy — should rarely happen now since
+      // we drop frames at _onFrame level instead of queuing them.
+      final detection = await QrEngine.detectFromGray(
+        gray,
+        image.width,
+        image.height,
+      );
 
-        // detectFromGray now drops the frame (returns null) if the isolate is
-        // busy — no throttle, no backlog, minimal latency.
-        final detection = await QrEngine.detectFromGray(
-          gray,
-          image.width,
-          image.height,
-        );
+      if (detection == null) return; // isolate busy — skip silently
 
-        if (detection == null) continue; // isolate busy, skip frame
-
-        // ── No QR found ───────────────────────────────────────────────────
-        if (!detection.detected || !detection.hasCorners) {
-          _missedFrames++;
-          if (_missedFrames >= _missedFramesToClear) {
-            _stableCheckCorners = const [];
-            if (mounted) {
-              setState(() => _displayCorners = const []);
-            }
+      // ── No QR found ─────────────────────────────────────────────────────
+      if (!detection.detected || !detection.hasCorners) {
+        _missedFrames++;
+        if (_missedFrames >= _missedFramesToClear) {
+          _stableCheckCorners = const [];
+          if (mounted) {
+            setState(() => _displayCorners = const []);
           }
-
-          // Degrade stability while QR is missing
-          _onUnstable();
-          continue;
         }
-
-        // ── QR detected ───────────────────────────────────────────────────
-        _missedFrames = 0;
-
-        if (detection.decoded && detection.text != null) {
-          widget.onDetect.call(detection.text!);
-        }
-
-        final widgetSize = _overlaySize;
-        final previewSize = _previewSize;
-        if (widgetSize == Size.zero || previewSize == Size.zero) continue;
-
-        final imageSize = Size(image.width.toDouble(), image.height.toDouble());
-
-        final sensorOrientation = _controller!.description.sensorOrientation;
-
-        // Map raw corners → widget space for this frame
-        final newWidgetCorners = detection.corners.map((p) {
-          return mapImageToWidget(
-            imagePoint: p,
-            imageSize: imageSize,
-            widgetSize: widgetSize,
-            sensorOrientation: sensorOrientation,
-            previewSize: previewSize,
-            isIOS: Platform.isIOS,
-          );
-        }).toList();
-
-        // ── Smooth the overlay corners ────────────────────────────────────
-        // smoothCorners blends previous display position with the new one so
-        // the box glides onto the QR code instead of teleporting.
-        // alpha=0.75 → responsive but not jittery; raise toward 1.0 for
-        // more snap, lower toward 0.5 for more smoothing.
-        final smoothed = smoothCorners(
-          _displayCorners,
-          newWidgetCorners,
-          alpha: 0.75,
-        );
-
-        if (mounted) {
-          setState(() => _displayCorners = smoothed);
-        }
-
-        // ── Stability check (capture gate only) ───────────────────────────
-        if (!cornersLookValid(detection.corners)) {
-          _onUnstable();
-        } else if (_stableCheckCorners.isNotEmpty &&
-            isStableCorners(_stableCheckCorners, newWidgetCorners)) {
-          _stableCount++;
-          _unstableFrames = 0;
-          // Track the sharpest/most-locked frame
-          final delta = averageCornerDelta(
-            _stableCheckCorners,
-            newWidgetCorners,
-          );
-          if (delta < _bestDelta) {
-            _bestDelta = delta;
-            _bestGray = gray;
-            _bestW = image.width;
-            _bestH = image.height;
-          }
-        } else {
-          _onUnstable();
-        }
-
-        _stableCheckCorners = newWidgetCorners;
-
-        if (_stableCount >= _stableNeeded && _bestGray != null) {
-          await _captureFinal(gray, image.width, image.height);
-          _bestDelta = double.infinity;
-          _bestGray = null;
-        }
-      } catch (e) {
-        debugPrint('Scan error: $e');
+        _onUnstable();
+        return;
       }
-    }
 
-    _isProcessing = false;
+      // ── QR detected ─────────────────────────────────────────────────────
+      _missedFrames = 0;
+
+      if (detection.decoded && detection.text != null) {
+        widget.onDetect.call(detection.text!);
+      }
+
+      final widgetSize = _overlaySize;
+      final previewSize = _previewSize;
+      if (widgetSize == Size.zero || previewSize == Size.zero) return;
+
+      final imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final sensorOrientation = _controller!.description.sensorOrientation;
+      final correctedPreviewSize = Platform.isIOS
+          ? Size(previewSize.height, previewSize.width)
+          : previewSize;
+
+      // Map raw ZXing corners → widget space.
+      // isIOS skips the rotation transform since iOS frames are already
+      // in display orientation unlike Android which comes in sensor orientation.
+
+      final newWidgetCorners = detection.corners.map((p) {
+        return mapImageToWidget(
+          imagePoint: p,
+          imageSize: imageSize,
+          widgetSize: widgetSize,
+          sensorOrientation: sensorOrientation,
+          previewSize: correctedPreviewSize, // use corrected size
+          isIOS: Platform.isIOS,
+        );
+      }).toList();
+
+      // ── Overlay smoothing ────────────────────────────────────────────────
+      //
+      // iOS  (alpha 0.75): gentle glide — hardware is fast and consistent.
+      // Android (alpha 0.92): near-instant snap — avoids blending toward a
+      //   stale position when detection gaps occur.
+      final smoothed = smoothCorners(
+        _displayCorners,
+        newWidgetCorners,
+        alpha: Platform.isIOS ? 0.75 : 0.92,
+      );
+
+      if (mounted) {
+        setState(() => _displayCorners = smoothed);
+      }
+
+      // ── Stability gate (capture only) ────────────────────────────────────
+      // cornersLookValid receives widget-space corners (newWidgetCorners) —
+      // NOT image-space corners (detection.corners). This is critical so the
+      // area threshold of 1500 is resolution-independent across both platforms.
+      if (!cornersLookValid(newWidgetCorners)) {
+        _onUnstable();
+      } else if (_stableCheckCorners.isNotEmpty &&
+          isStableCorners(_stableCheckCorners, newWidgetCorners)) {
+        _stableCount++;
+        _unstableFrames = 0;
+
+        // Track the frame where corners moved the least — that is the
+        // sharpest, most locked-on frame and gives the best capture image.
+        final delta = averageCornerDelta(_stableCheckCorners, newWidgetCorners);
+        if (delta < _bestDelta) {
+          _bestDelta = delta;
+          _bestGray = gray;
+          _bestW = image.width;
+          _bestH = image.height;
+        }
+      } else {
+        _onUnstable();
+      }
+
+      // Always update with latest widget-space corners for next frame comparison.
+      _stableCheckCorners = newWidgetCorners;
+
+      if (_stableCount >= _stableNeeded && _bestGray != null) {
+        await _captureFinal(_bestGray!, _bestW, _bestH);
+        _bestDelta = double.infinity;
+        _bestGray = null;
+        _bestW = 0;
+        _bestH = 0;
+      }
+    } catch (e) {
+      debugPrint('Scan error: $e');
+    } finally {
+      // Always release the processing lock so the next frame can be picked up.
+      _isProcessing = false;
+    }
   }
 
   void _onUnstable() {
     if (_stableCount > 0) _stableCount--;
     _unstableFrames++;
     if (_unstableFrames > _stableResetGap) {
-      _stableCheckCorners = const []; // was _rawImageCorners
+      _stableCheckCorners = const [];
     }
   }
 

@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'vision_scan'
-  s.version          = '0.0.6'
+  s.version          = '0.0.7'
   s.summary          = 'High-performance on-device scanner using OpenCV and ZXing'
   s.description      = <<-DESC
     vision_scan is a Flutter FFI plugin that provides fast, on-device
