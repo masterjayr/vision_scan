@@ -1,8 +1,9 @@
 import java.net.URL
 import java.util.zip.ZipInputStream
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.vision.scan.vision_scan"
-version = "0.0.7"
+version = "0.0.8"
 
 plugins {
     id("com.android.library")
@@ -16,10 +17,21 @@ android {
         minSdk = 24
     }
 
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
     // 🔑 Load native libs from build/ (cleaned by `flutter clean`)
     sourceSets["main"].jniLibs.srcDirs(
         layout.buildDirectory.dir("intermediates/vision_scan_native")
     )
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
 }
 
 repositories {
