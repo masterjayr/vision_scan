@@ -17,6 +17,14 @@ jobs:
       - name: Select Xcode 26.0.1
         run: sudo xcode-select -s /Applications/Xcode_26.0.1.app
 
+      # macos-26 ships Xcode 26 but often without the iOS *platform* component.
+      # Without this, xcodebuild fails: "iOS 26.0 is not installed".
+      - name: Install iOS platform
+        run: |
+          sudo xcodebuild -runFirstLaunch
+          xcrun simctl list >/dev/null || true
+          xcodebuild -downloadPlatform iOS
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
