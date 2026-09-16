@@ -18,7 +18,7 @@ let package = Package(
         .binaryTarget(
             name: "vision_scan_native",
             url: "https://github.com/masterjayr/vision_scan/releases/download/v0.0.9/vision_scan_native-ios.zip",
-            checksum: "0a5307816b19bf48670b3ad5821e0aa9bae5cdd1abbe5e58d2c42606ef403e1f"
+            checksum: "cc1141d729301885c9b8ed7450307510e207e512abae9b0928e56da455c6c114"
         ),
         .target(
             name: "vision_scan",
