@@ -48,11 +48,25 @@ jobs:
       - name: Package iOS xcframework
         run: |
           mkdir -p dist/ios
-          cd ios/Frameworks
-          zip -r ../../dist/ios/vision_scan_native-ios.zip vision_scan_native.xcframework
+          # Deterministic zip so a retag with the same xcframework keeps the same SPM checksum.
+          (
+            cd ios/Frameworks
+            find vision_scan_native.xcframework -exec touch -t 202001010000 {} +
+            TZ=UTC zip -X -r ../../dist/ios/vision_scan_native-ios.zip vision_scan_native.xcframework
+          )
+
+      # Upload first so a checksum mismatch still publishes the iOS asset.
+      - name: Upload iOS binaries to release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/ios/vision_scan_native-ios.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # SPM binaryTarget requires URL + sha256 of this exact zip in Package.swift.
-      # Update before tagging: scripts/update_ios_spm_checksum.sh dist/ios/vision_scan_native-ios.zip <ver>
       - name: Validate SPM Package.swift checksum
         run: |
           chmod +x scripts/update_ios_spm_checksum.sh
@@ -62,21 +76,14 @@ jobs:
           fi
           if ! scripts/update_ios_spm_checksum.sh --check dist/ios/vision_scan_native-ios.zip "$VERSION"; then
             echo "::error::ios/vision_scan/Package.swift does not match the built zip."
-            echo "Compute and commit the checksum, then retag:"
-            echo "  scripts/update_ios_spm_checksum.sh dist/ios/vision_scan_native-ios.zip $VERSION"
+            echo "After this job, download dist/ios/vision_scan_native-ios.zip (or the release asset),"
+            echo "then locally run:"
+            echo "  scripts/update_ios_spm_checksum.sh /path/to/vision_scan_native-ios.zip $VERSION"
+            echo "Commit Package.swift, push main, then: git tag -f v$VERSION && git push origin v$VERSION --force"
             scripts/update_ios_spm_checksum.sh dist/ios/vision_scan_native-ios.zip "$VERSION"
             git --no-pager diff -- ios/vision_scan/Package.swift || true
             exit 1
           fi
-
-      - name: Upload iOS binaries to release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ${{ github.ref_name }}
-          files: |
-            dist/ios/vision_scan_native-ios.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   android-native:
     name: Build Android native libs

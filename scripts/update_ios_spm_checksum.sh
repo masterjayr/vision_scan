@@ -124,15 +124,17 @@ url = sys.argv[2]
 checksum = sys.argv[3]
 text = path.read_text()
 
+# Use \g<1> so a checksum starting with hex digits (e.g. 0a...) is not
+# parsed as group reference \10, \11, etc.
 text2, n_url = re.subn(
     r'(url:\s*")[^"]+(")',
-    rf'\1{url}\2',
+    rf'\g<1>{url}\g<2>',
     text,
     count=1,
 )
 text3, n_sum = re.subn(
     r'(checksum:\s*")[0-9a-f]+(")',
-    rf'\1{checksum}\2',
+    rf'\g<1>{checksum}\g<2>',
     text2,
     count=1,
 )
