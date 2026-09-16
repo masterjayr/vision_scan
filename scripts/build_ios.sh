@@ -159,15 +159,20 @@ build_vision_scan_native_xcframework() {
   rsync -a "$zxing_xc/" "$NATIVE_IOS_FRAMEWORKS_DIR/ZXing.xcframework/"
 
   log "Archiving vision_scan_native (iphoneos)"
+  # Explicit iOS destination + SUPPORTS_MACCATALYST=NO: Xcode 26 otherwise
+  # tries Mac Catalyst and fails because ZXing/OpenCV have no catalyst slice.
   xcodebuild archive \
     -project "$project_path" \
     -scheme "$scheme" \
     -configuration Release \
     -sdk iphoneos \
+    -destination 'generic/platform=iOS' \
     -archivePath "$derived/vision_scan_native-iphoneos.xcarchive" \
     SKIP_INSTALL=NO \
     BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
-    CODE_SIGNING_ALLOWED=NO
+    CODE_SIGNING_ALLOWED=NO \
+    SUPPORTS_MACCATALYST=NO \
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD=NO
 
   rm -rf "$out_xc"
   xcodebuild -create-xcframework \
