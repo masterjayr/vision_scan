@@ -3,7 +3,7 @@ import java.util.zip.ZipInputStream
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 group = "com.vision.scan.vision_scan"
-version = "0.0.8"
+version = "0.0.9"
 
 plugins {
     id("com.android.library")

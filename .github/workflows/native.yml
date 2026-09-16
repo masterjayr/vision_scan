@@ -43,6 +43,24 @@ jobs:
           cd ios/Frameworks
           zip -r ../../dist/ios/vision_scan_native-ios.zip vision_scan_native.xcframework
 
+      # SPM binaryTarget requires URL + sha256 of this exact zip in Package.swift.
+      # Update before tagging: scripts/update_ios_spm_checksum.sh dist/ios/vision_scan_native-ios.zip <ver>
+      - name: Validate SPM Package.swift checksum
+        run: |
+          chmod +x scripts/update_ios_spm_checksum.sh
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ "${{ github.ref_type }}" != "tag" ]]; then
+            VERSION="$(python3 -c "import re; print(re.search(r\"s\\.version\\s*=\\s*'([^']+)'\", open('ios/vision_scan.podspec').read()).group(1))")"
+          fi
+          if ! scripts/update_ios_spm_checksum.sh --check dist/ios/vision_scan_native-ios.zip "$VERSION"; then
+            echo "::error::ios/vision_scan/Package.swift does not match the built zip."
+            echo "Compute and commit the checksum, then retag:"
+            echo "  scripts/update_ios_spm_checksum.sh dist/ios/vision_scan_native-ios.zip $VERSION"
+            scripts/update_ios_spm_checksum.sh dist/ios/vision_scan_native-ios.zip "$VERSION"
+            git --no-pager diff -- ios/vision_scan/Package.swift || true
+            exit 1
+          fi
+
       - name: Upload iOS binaries to release
         uses: softprops/action-gh-release@v1
         with:

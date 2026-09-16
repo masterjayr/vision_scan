@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'vision_scan'
-  s.version          = '0.0.8'
+  s.version          = '0.0.9'
   s.summary          = 'High-performance on-device scanner using OpenCV and ZXing'
   s.description      = <<-DESC
     vision_scan is a Flutter FFI plugin that provides fast, on-device
@@ -19,6 +19,12 @@ Pod::Spec.new do |s|
   s.source           = { :path => '.' }
 
   s.ios.deployment_target = '12.0'
+
+  # Swift sources live under the SPM package layout (shared with Package.swift).
+  s.source_files = 'vision_scan/Sources/vision_scan/**/*.swift'
+  s.resource_bundles = {
+    'vision_scan_privacy' => ['vision_scan/Sources/vision_scan/PrivacyInfo.xcprivacy']
+  }
 
   # -------------------------------------------------
   # Prefer local xcframework for development; else download from GitHub

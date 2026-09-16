@@ -1,6 +1,6 @@
 name: vision_scan
 description: "High-performance on-device vision scanning using OpenCV + ZXing"
-version: 0.0.1
+version: 0.0.9
 homepage:
 
 environment:

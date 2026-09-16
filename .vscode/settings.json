@@ -33,5 +33,6 @@
         "string_view": "cpp",
         "typeinfo": "cpp",
         "variant": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "/Users/emmanuelemmanuel/Documents/practice_plugin/vision_scan/windows"
 }
