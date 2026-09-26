@@ -74,3 +74,4 @@ native/windows/.vs/
 *.so
 *.a
 *.dylib
+.venv-docs/
